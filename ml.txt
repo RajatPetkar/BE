@@ -1,0 +1,928 @@
+----------------------------------------- C1 ----------------------------------------
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+contract BankAccount {
+address public owner;
+uint256 private balance;
+constructor() {
+owner = msg.sender;
+}
+function deposit() public payable {
+require(msg.sender==owner,"Only owner can deposite");
+require(msg.value > 0, "Deposit amount must be greater than zero");
+balance += msg.value;
+}
+function withdraw() public payable{
+require(msg.sender == owner, "Only owner can withdraw");
+require(msg.value > 0, "Amount must be greater than zero");
+require(msg.value <= balance, "Insufficient balance");
+balance -= msg.value;
+}
+function getBalance() public view returns (uint256) {
+return balance;
+}
+}
+
+------------------------------------------- C2 ------------------------------------------
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+contract StudentData {
+struct Student {
+uint rollno;
+string name;
+}
+Student[] private arr;
+function addStudent(
+uint256 rollno,
+string memory name
+) public {
+    for(uint i=0;i<arr.length;i++){
+        if(arr[i].rollno==rollno){
+            revert("data already present");
+        }
+    }
+    arr.push(Student(rollno,name));
+}
+function getStudentCount() public view returns (uint256) {
+    return arr.length;
+}
+function allstudents()public view returns(Student[] memory){
+    return arr;
+}
+function getStudent(uint idx)public view returns(Student memory){
+    require(idx < arr.length, "Invalid student index");
+    return arr[idx];
+}
+}
+-------------------------------------------- ML1 ---------------------------------------------
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score, mean_squared_error
+df = pd.read_csv("uber.csv")
+print("Dataset Shape:", df.shape)
+print(df.head())
+
+
+df = df.drop(columns=["Unnamed: 0", "key"], errors="ignore")
+df = df.dropna()
+df["pickup_datetime"] = pd.to_datetime(
+    df["pickup_datetime"], errors="coerce"
+)
+df = df.dropna(subset=["pickup_datetime"])
+# Extract date and time features
+df["year"] = df["pickup_datetime"].dt.year
+df["month"] = df["pickup_datetime"].dt.month
+df["hour"] = df["pickup_datetime"].dt.hour
+df["weekday"] = df["pickup_datetime"].dt.day_of_week
+
+lon1 = np.radians(df["pickup_longitude"])
+lat1 = np.radians(df["pickup_latitude"])
+lon2 = np.radians(df["dropoff_longitude"])
+lat2 = np.radians(df["dropoff_latitude"])
+
+a = (np.sin((lat2-lat1)/2)**2 +
+     np.cos(lat1)*np.cos(lat2)*np.sin((lon2-lon1)/2)**2)
+df["distance_km"] = 6371 * 2 * np.arcsin(np.sqrt(a))
+# Remove unnecessary columns
+df = df.drop(columns=[
+    "pickup_datetime",
+    "pickup_longitude", "pickup_latitude",
+    "dropoff_longitude", "dropoff_latitude"
+])
+# Remove invalid values
+df = df[
+    (df["fare_amount"] > 0) &
+    (df["distance_km"] > 0) &
+    (df["passenger_count"].between(1, 6))
+]
+print("After preprocessing:", df.shape)
+# df[["fare_amount", "distance_km"]].plot(
+#     kind="box", subplots=True, figsize=(8, 5)
+# )
+# plt.show()
+
+
+df[["fare_amount", "distance_km"]].boxplot()
+plt.show()
+# Remove outliers using IQR
+for col in ["fare_amount", "distance_km"]:
+    Q1 = df[col].quantile(0.25)
+    Q3 = df[col].quantile(0.75)
+    IQR = Q3 - Q1
+
+    df = df[
+        df[col].between(Q1 - 1.5*IQR, Q3 + 1.5*IQR)
+    ]
+
+df[["fare_amount", "distance_km"]].boxplot()
+plt.show()
+
+
+corr = df.corr()
+
+sns.heatmap(corr, annot=True, cmap="coolwarm")
+plt.title("Correlation Heatmap")
+plt.show()
+print(corr["fare_amount"])
+X = df.drop(columns=["fare_amount"])
+y = df["fare_amount"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+models = {
+    "Linear Regression": LinearRegression(),
+    "Random Forest": RandomForestRegressor(
+        n_estimators=50, random_state=42
+    )
+}
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    pred = model.predict(X_test)
+    r2 = r2_score(y_test, pred)
+    rmse = np.sqrt(mean_squared_error(y_test, pred))
+    print("\n", name)
+    print("R2 Score:", r2)
+    print("RMSE:", rmse)
+
+
+-------------------------------------------- ML2 ---------------------------------------------
+# B2: Classify email as Spam / Not Spam using KNN and SVM
+from pathlib import Path
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+# df = pd.read_csv(Path(__file__).parent / "emails.csv")
+df = pd.read_csv("emails.csv")
+
+print("Shape:", df.shape)
+print("Missing values:", df.isnull().sum().sum())
+print("Class counts:\n", df["Prediction"].value_counts())
+
+X = df.drop(columns=["Email No.", "Prediction"])
+y = df["Prediction"]
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y)
+
+models = {
+    "KNN (k=5)": KNeighborsClassifier(n_neighbors=5),
+    "SVM (linear)": SVC(kernel="linear"),
+}
+for name, model in models.items():
+    model.fit(X_train, y_train)
+    pred = model.predict(X_test)
+    print(f"\n===== {name} =====")
+    print("Accuracy:", round(accuracy_score(y_test, pred), 4))
+    print("Confusion matrix:\n", confusion_matrix(y_test, pred))
+    print(classification_report(y_test, pred, target_names=["Not Spam", "Spam"]))
+
+
+-------------------------------------------- ML3 ---------------------------------------------
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.neural_network import MLPClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+
+# Load dataset
+df = pd.read_csv("Churn_Modelling.csv")
+
+# Remove unnecessary columns
+df.drop(["RowNumber", "CustomerId", "Surname"], axis=1, inplace=True)
+
+# Convert categorical data into numbers
+le = LabelEncoder()
+df["Gender"] = le.fit_transform(df["Gender"])
+
+df = pd.get_dummies(df, columns=["Geography"], drop_first=True, dtype=int)
+
+# Split features and target
+X = df.drop("Exited", axis=1)
+y = df["Exited"]
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
+
+# Normalize the data
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+X_test = sc.transform(X_test)
+
+# Create and train neural network
+model = MLPClassifier(
+    hidden_layer_sizes=(16, 8),
+    max_iter=500,
+    random_state=42
+)
+
+model.fit(X_train, y_train)
+
+# Predict results
+y_pred = model.predict(X_test)
+
+# Evaluate model
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Confusion Matrix:")
+print(confusion_matrix(y_test, y_pred))
+
+-------------------------------------------- ML4 ---------------------------------------------
+# B4: Gradient Descent to find the local minimum of y = (x + 3)^2, starting at x = 2
+# dy/dx = 2(x + 3)   update rule: x = x - lr * dy/dx   (true minimum: x = -3, y = 0)
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def f(x):
+    return (x + 3) ** 2
+
+def grad(x):
+    return 2 * (x + 3)
+
+x, lr, tol, max_iter = 2.0, 0.1, 1e-6, 1000 
+path = [x]
+
+print("Iter        x            y")
+for i in range(1, max_iter + 1):
+    step = lr * grad(x)
+    x = x - step
+    path.append(x)
+    if i <= 10 or abs(step) < tol:
+        print(f"{i:4d}   {x:10.6f}   {f(x):10.6f}")
+    if abs(step) < tol:          # converged
+        break
+
+print(f"\nConverged in {i} iterations: x = {x:.6f}, y = {f(x):.8f}")
+
+xs = np.linspace(-8, 4, 200)
+plt.plot(xs, f(xs), label="y = (x+3)^2")
+plt.scatter(path, [f(p) for p in path], color="red", s=15, label="GD steps")
+plt.xlabel("x")
+plt.ylabel("y")
+plt.title("Gradient Descent from x = 2")
+plt.legend()
+plt.show()
+
+-------------------------------------------- ML5 ---------------------------------------------
+# B5: K-Means clustering on sales_data_sample.csv; choose K using the Elbow method
+import pandas as pd
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+
+# File is not UTF-8 -> latin1 encoding needed
+# df = pd.read_csv(Path(__file__).parent / "sales_data_sample.csv", encoding="latin1")
+df = pd.read_csv("sales_data_sample.csv", encoding="latin1")
+print("Shape:", df.shape)
+features = ["QUANTITYORDERED", "PRICEEACH", "SALES", "MSRP"]
+X = StandardScaler().fit_transform(df[features])   # scale so SALES doesn't dominate
+
+# Elbow method: inertia (WCSS) for K = 1..10
+wcss = []
+for k in range(1, 11):
+    km = KMeans(n_clusters=k, n_init=10, random_state=42).fit(X)
+    wcss.append(km.inertia_)
+    print(f"K={k:2d}  WCSS={km.inertia_:.1f}")
+
+plt.plot(range(1, 11), wcss, marker="o")
+plt.xlabel("Number of clusters K")
+plt.ylabel("WCSS (inertia)")
+plt.title("Elbow Method")
+plt.show()
+
+# K chosen where the curve bends (the "elbow")
+k = 3
+km = KMeans(n_clusters=k, n_init=10, random_state=42).fit(X)
+df["Cluster"] = km.labels_
+
+print(f"\nK = {k}\nCluster sizes:\n", df["Cluster"].value_counts().sort_index())
+print("\nCluster means:\n", df.groupby("Cluster")[features].mean().round(2))
+
+plt.scatter(df["QUANTITYORDERED"], df["SALES"], c=df["Cluster"], cmap="viridis", s=10)
+plt.xlabel("Quantity Ordered")
+plt.ylabel("Sales")
+plt.title(f"K-Means clusters (K = {k})")
+plt.show()
+
+-------------------------------------------- daa1 ---------------------------------------------
+
+#include <iostream>
+using namespace std;
+
+// Recursive Fibonacci
+int fibonacciRecursive(int n) {
+    if (n <= 1)
+        return n;
+
+    return fibonacciRecursive(n - 1) + fibonacciRecursive(n - 2);
+}
+
+// Non-recursive Fibonacci
+void fibonacciIterative(int n) {
+    int a = 0, b = 1, c;
+
+    for (int i = 0; i < n; i++) {
+        cout << a << " ";
+        c = a + b;
+        a = b;
+        b = c;
+    }
+}
+
+// Print Fibonacci using recursion
+void printRecursive(int n) {
+    for (int i = 0; i < n; i++) {
+        cout << fibonacciRecursive(i) << " ";
+    }
+}
+
+int main() {
+    int choice, n;
+
+    do {
+        cout << "\n\n----- FIBONACCI MENU -----";
+        cout << "\n1. Recursive Fibonacci";
+        cout << "\n2. Non-Recursive Fibonacci";
+        cout << "\n3. Exit";
+
+        cout << "\nEnter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1:
+                cout << "Enter number of terms: ";
+                cin >> n;
+
+                if (n < 0) {
+                    cout << "Invalid input!";
+                    break;
+                }
+
+                cout << "Fibonacci Series: ";
+                printRecursive(n);
+                break;
+
+            case 2:
+                cout << "Enter number of terms: ";
+                cin >> n;
+
+                if (n < 0) {
+                    cout << "Invalid input!";
+                    break;
+                }
+
+                cout << "Fibonacci Series: ";
+                fibonacciIterative(n);
+                break;
+
+            case 3:
+                cout << "Exiting...";
+                break;
+
+            default:
+                cout << "Invalid choice!";
+        }
+
+    } while (choice != 3);
+
+    return 0;
+}
+
+
+-------------------------------------------- daa2 ---------------------------------------------
+
+
+#include <bits/stdc++.h>
+using namespace std;
+
+struct node{
+    char ch;
+    int freq;
+    node *left,*right;
+    node(char c,int f){
+        ch=c;
+        freq=f;
+        left=right=nullptr;
+    }
+};
+struct compare{
+    bool operator()(node*a,node*b){
+        return a->freq>b->freq;
+    }
+};
+void print(node*root,string code){
+    if(root==nullptr)return;
+    if(!root->left && !root->right){
+        cout<<root->ch<<" : "<<code<<endl;
+        return;
+    }
+    print(root->left,code+"0");
+    print (root->right,code+"1");
+
+}
+void huffmanEncoding(char ch[],int freq[],int n){
+    priority_queue<node*,vector<node*>,compare>pq;
+
+    for(int i=0;i<n;i++){
+        pq.push(new node(ch[i],freq[i]));
+    }
+    while(pq.size()>1){
+        node*left=pq.top();
+        pq.pop();
+        node*right=pq.top();
+        pq.pop();
+        node* newnode= new node('$',left->freq+right->freq);
+        newnode->left=left;
+        newnode->right=right;
+        pq.push(newnode);
+    }
+    cout<<"\nHuffman Codes:\n";
+    print(pq.top(),"");
+}
+int main() {
+    int choice;
+
+    do {
+        cout << "\n----- HUFFMAN ENCODING MENU -----";
+        cout << "\n1. Generate Huffman Codes";
+        cout << "\n2. Exit";
+        cout << "\nEnter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+
+            case 1: {
+                int n;
+
+                cout << "Enter number of characters: ";
+                cin >> n;
+
+                if (n <= 0) {
+                    cout << "Invalid number of characters!";
+                    break;
+                }
+
+                char ch[n];
+                int freq[n];
+
+                cout << "Enter characters and their frequencies:\n";
+
+                for (int i = 0; i < n; i++) {
+                    cin >> ch[i] >> freq[i];
+
+                    if (freq[i] <= 0) {
+                        cout << "Frequency must be positive!";
+                        break;
+                    }
+                }
+
+                huffmanEncoding(ch, freq, n);
+                break;
+            }
+
+            case 2:
+                cout << "Exiting...";
+                break;
+
+            default:
+                cout << "Invalid choice!";
+        }
+
+    } while (choice != 2);
+
+    return 0;
+}
+
+-------------------------------------------- daa3 ---------------------------------------------
+#include<bits/stdc++.h>
+using namespace std;
+
+int knapsack(int W, int wt[], int val[], int n) {
+
+    int dp[n + 1][W + 1];
+
+    // Initialize DP table
+    for (int i = 0; i <= n; i++) {
+        for (int w = 0; w <= W; w++) {
+
+            if (i == 0 || w == 0) {
+                dp[i][w] = 0;
+            }
+
+            else if (wt[i - 1] <= w) {
+                dp[i][w] = max(
+                    val[i - 1] + dp[i - 1][w - wt[i - 1]],
+                    dp[i - 1][w]
+                );
+            }
+
+            else {
+                dp[i][w] = dp[i - 1][w];
+            }
+        }
+    }
+
+    return dp[n][W];
+}
+
+
+int main() {
+    int choice;
+
+    do {
+        cout << "\n----- 0-1 KNAPSACK MENU -----";
+        cout << "\n1. Solve Knapsack Problem";
+        cout << "\n2. Exit";
+        cout << "\nEnter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+
+            case 1: {
+                int n, W;
+
+                cout << "Enter number of items: ";
+                cin >> n;
+
+                if (n <= 0) {
+                    cout << "Invalid number of items!";
+                    break;
+                }
+
+                int wt[n], val[n];
+
+                cout << "Enter weights of items:\n";
+                for (int i = 0; i < n; i++) {
+                    cin >> wt[i];
+                }
+
+                cout << "Enter values of items:\n";
+                for (int i = 0; i < n; i++) {
+                    cin >> val[i];
+                }
+
+                cout << "Enter knapsack capacity: ";
+                cin >> W;
+
+                if (W < 0) {
+                    cout << "Invalid capacity!";
+                    break;
+                }
+
+                int result = knapsack(W, wt, val, n);
+
+                cout << "\nMaximum Profit = " << result << endl;
+                break;
+            }
+
+            case 2:
+                cout << "Exiting...";
+                break;
+
+            default:
+                cout << "Invalid choice!";
+        }
+
+    } while (choice != 2);
+
+    return 0;
+}
+
+
+
+// dp[i][w]
+// means maximum value using the first i items with capacity w.
+
+-------------------------------------------- daa4 ---------------------------------------------
+
+#include <iostream>
+using namespace std;
+
+int board[20][20];
+
+// Check whether placing a queen is safe
+bool isSafe(int row, int col, int n) {
+
+    // Check same column (above)
+    for (int i = 0; i < n; i++) {
+        if(i==row)continue;
+        if (board[i][col] == 1)
+            return false;
+    }
+
+    // Check upper-left diagonal
+    for (int i = row - 1, j = col - 1;
+         i >= 0 && j >= 0; i--, j--) {
+
+        if (board[i][j] == 1)
+            return false;
+    }
+
+    // Check upper-right diagonal
+    for (int i = row - 1, j = col + 1;
+         i >= 0 && j < n; i--, j++) {
+
+        if (board[i][j] == 1)
+            return false;
+    }
+    //check down left diagonal
+        for (int i = row +1, j = col - 1;
+         i <n && j >= 0; i++, j--) {
+
+        if (board[i][j] == 1)
+            return false;
+    }
+
+    // Check down-right diagonal
+    for (int i = row +1, j = col + 1;
+         i<n && j < n; i++, j++) {
+
+        if (board[i][j] == 1)
+            return false;
+    }
+
+    return true;
+}
+
+// Solve N-Queens using backtracking
+bool solveNQueens(int row, int n, int fixedRow) {
+
+    // All rows completed
+    if (row == n)
+        return true;
+
+    // Skip the row containing the first queen
+    if (row == fixedRow)
+        return solveNQueens(row + 1, n, fixedRow);
+
+    for (int col = 0; col < n; col++) {
+
+        if (isSafe(row, col, n)) {
+
+            board[row][col] = 1;
+
+            if (solveNQueens(row + 1, n, fixedRow))
+                return true;
+
+            // Backtrack
+            board[row][col] = 0;
+        }
+    }
+
+    return false;
+}
+
+
+// Display chessboard
+void display(int n) {
+
+    cout << "\nChessboard:\n";
+
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            if(board[i][j]){
+                cout<< " Q ";
+            }
+            else{
+                cout<< " . ";
+            }
+        }
+        cout << endl;
+    }
+}
+
+int main() {
+
+    int choice, n, row, col;
+
+    do {
+        cout << "\n----- N-QUEENS MENU -----";
+        cout << "\n1. Solve N-Queens";
+        cout << "\n2. Exit";
+        cout << "\nEnter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+
+            case 1: {
+
+                cout << "Enter value of N: ";
+                cin >> n;
+
+                if (n < 1 || n > 20) {
+                    cout << "Enter N between 1 and 20!";
+                    break;
+                }
+
+                // Initialize board with zeros
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < n; j++) {
+                        board[i][j] = 0;
+                    }
+                }
+
+                cout << "Enter first queen position (row and column): ";
+                cin >> row >> col;
+
+                // Convert to 0-based indexing
+                row--;
+                col--;
+
+                if (row < 0 || row >= n ||
+                    col < 0 || col >= n) {
+
+                    cout << "Invalid position!";
+                    break;
+                }
+
+                // Place the first queen
+                board[row][col] = 1;
+
+                // Solve remaining queens
+                if (isSafe(row, col, n) &&
+                    solveNQueens(0, n, row)) {
+
+                    cout << "\nSolution exists!";
+                    display(n);
+                }
+                else {
+                    cout << "\nNo solution exists for this position!";
+                }
+
+                break;
+            }
+
+            case 2:
+                cout << "Exiting...";
+                break;
+
+            default:
+                cout << "Invalid choice!";
+        }
+
+    } while (choice != 2);
+
+    return 0;
+}
+
+-------------------------------------------- daa5 ---------------------------------------------
+#include <bits/stdc++.h>
+using namespace std;   
+
+int partitionDeterministic(int arr[], int s, int e) {
+
+    int pivot = arr[s];
+
+    int cnt = 0;
+
+    for(int i = s + 1; i <= e; i++) {
+        if(arr[i] <= pivot) {
+            cnt++;
+        }
+    }
+
+    int pivotIndex = s + cnt;
+    swap(arr[pivotIndex], arr[s]);
+
+    int i = s, j = e;
+
+    while(i < pivotIndex && j > pivotIndex) {
+
+        while(i < pivotIndex && arr[i] <= pivot) {
+            i++;
+        }
+
+        while(j > pivotIndex && arr[j] > pivot) {
+            j--;
+        }
+
+        if(i < pivotIndex && j > pivotIndex) {
+            swap(arr[i++], arr[j--]);
+        }
+    }
+
+    return pivotIndex;
+}
+
+// Randomized Partition
+int partitionRandomized(int arr[], int low, int high) {
+    int randomIndex = low + rand() % (high - low + 1);
+
+    swap(arr[randomIndex], arr[low]);
+
+    return partitionDeterministic(arr, low, high);
+}
+
+// Deterministic Quick Sort
+void quickSortDeterministic(int arr[], int low, int high) {
+    if (low < high) {
+        int pivot = partitionDeterministic(arr, low, high);
+
+        quickSortDeterministic(arr, low, pivot - 1);
+        quickSortDeterministic(arr, pivot + 1, high);
+    }
+}
+
+// Randomized Quick Sort
+void quickSortRandomized(int arr[], int low, int high) {
+    if (low < high) {
+        int pivot = partitionRandomized(arr, low, high);
+
+        quickSortRandomized(arr, low, pivot - 1);
+        quickSortRandomized(arr, pivot + 1, high);
+    }
+}
+
+
+
+
+// Display Array
+void display(int arr[], int n) {
+    for (int i = 0; i < n; i++) {
+        cout << arr[i] << " ";
+    }
+    cout << endl;
+}
+
+int main() {
+    srand(time(0));
+
+    int choice, n;
+
+    do {
+        cout << "\n----- QUICK SORT MENU -----";
+        cout << "\n1. Deterministic Quick Sort";
+        cout << "\n2. Randomized Quick Sort";
+        cout << "\n3. Exit";
+
+        cout << "\nEnter your choice: ";
+        cin >> choice;
+
+        switch (choice) {
+
+            case 1: {
+                cout << "Enter number of elements: ";
+                cin >> n;
+
+                if (n <= 0) {
+                    cout << "Invalid size!";
+                    break;
+                }
+
+                int arr[n];
+
+                cout << "Enter array elements: ";
+                for (int i = 0; i < n; i++) {
+                    cin >> arr[i];
+                }
+
+                quickSortDeterministic(arr, 0, n-1);
+
+                cout << "Sorted Array: ";
+                display(arr, n);
+                break;
+            }
+
+            case 2: {
+                cout << "Enter number of elements: ";
+                cin >> n;
+
+                if (n <= 0) {
+                    cout << "Invalid size!";
+                    break;
+                }
+
+                int arr[n];
+
+                cout << "Enter array elements: ";
+                for (int i = 0; i < n; i++) {
+                    cin >> arr[i];
+                }
+
+                quickSortRandomized(arr, 0, n - 1);
+
+                cout << "Sorted Array: ";
+                display(arr, n);
+                break;
+            }
+
+            case 3:
+                cout << "Exiting...";
+                break;
+
+            default:
+                cout << "Invalid choice!";
+        }
+
+    } while (choice != 3);
+
+    return 0;
+}
