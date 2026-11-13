@@ -1,0 +1,181 @@
+
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity USR is
+    Port ( Pin : in  STD_LOGIC_VECTOR (3 downto 0);
+           Sin : in  STD_LOGIC;
+           Mode : in  STD_LOGIC_VECTOR (1 downto 0);
+           rst : in  STD_LOGIC;
+           clk : in  STD_LOGIC;
+           Sout : out  STD_LOGIC;
+           Pout : out  STD_LOGIC_VECTOR (3 downto 0));
+end USR;
+
+architecture USR_arch of USR is
+	 SIGNAL temp : STD_LOGIC_VECTOR(3 DOWNTO 0):="0000" ;
+    SIGNAL flag : STD_LOGIC:='0';
+begin
+	PROCESS(rst, clk, mode, Sin, Pin)
+	BEGIN
+		IF rst='1' THEN
+			Sout <= '0';
+			Pout <= "0000";
+			flag <= '0';
+		   ELSIF falling_edge(clk) THEN
+				CASE MODE IS 
+					WHEN "00" =>
+						temp(3 DOWNTO 1) <= temp(2 DOWNTO 0);
+						temp(0) <= Sin;
+						Sout <= temp(3);
+						Pout <="0000";
+						flag <= '0';
+					WHEN "01"=> 
+						temp(3 DOWNTO 1) <= temp(2 DOWNTO 0);
+						temp(0) <= Sin; 
+						Pout<=temp;
+						Sout <= '0';
+						flag <= '0';
+					WHEN "10"=>
+						IF flag='0' THEN
+							temp <= Pin; 
+							Pout <= "0000";
+						ELSE  
+							Sout <= temp(3);	
+							Pout <= "0000";
+							 temp(3 DOWNTO 1) <= temp(2 DOWNTO 0);
+						END IF;
+						flag <= '1';
+					WHEN OTHERS =>                     
+						temp <= Pin;
+						Pout <= temp;
+						Sout <= '0';
+						flag <= '0';
+					END CASE;
+				END IF;
+			END PROCESS;
+						
+end USR_arch;
+
+
+
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.std_logic_unsigned.ALL;
+ 
+ENTITY USR_TB IS
+END USR_TB;
+ 
+ARCHITECTURE behavior OF USR_TB IS 
+ 
+    -- Component Declaration for the Unit Under Test (UUT)
+ 
+    COMPONENT USR
+    PORT(
+         Pin : IN  std_logic_vector(3 downto 0);
+         Sin : IN  std_logic;
+         Mode : IN  std_logic_vector(1 downto 0);
+         rst : IN  std_logic;
+         clk : IN  std_logic;
+         Sout : OUT  std_logic;
+         Pout : OUT  std_logic_vector(3 downto 0)
+        );
+    END COMPONENT;
+    
+
+   --Inputs
+   signal Pin : std_logic_vector(3 downto 0) := "1110";
+   signal Sin : std_logic := '0';
+   signal Mode : std_logic_vector(1 downto 0) := (others => '0');
+   signal rst : std_logic := '0';
+   signal clk : std_logic := '1';
+
+ 	--Outputs
+   signal Sout : std_logic;
+   signal Pout : std_logic_vector(3 downto 0);
+
+   -- Clock period definitions
+   constant clk_period : time := 10 ns;
+ 
+BEGIN
+ 
+	-- Instantiate the Unit Under Test (UUT)
+   uut: USR PORT MAP (
+          Pin => Pin,
+          Sin => Sin,
+          Mode => Mode,
+          rst => rst,
+          clk => clk,
+          Sout => Sout,
+          Pout => Pout
+        );
+
+   -- Clock process definitions
+   clk_process :process
+   begin
+		clk <= '0';
+		wait for clk_period/2;
+		clk <= '1';
+		wait for clk_period/2;
+   end process;
+ 
+
+   -- Stimulus process for Mode
+	
+   stim_proc_Mode: process
+   begin		
+		Mode <= "00";
+		wait for 80 ns;
+		Mode <= "01";
+		wait for 50 ns;
+		Mode <= "10";
+		wait for 50 ns;
+		Mode <= "11";
+		wait for 20 ns;
+	end process;
+	
+	-- Stimulus process for Sin
+
+	stim_proc_Sin: process
+	begin
+		Sin <= '1';
+		wait for 10 ns;
+		Sin <= '0';
+		wait for 10 ns;
+		Sin <= '1';
+		wait for 10 ns;
+		Sin <= '0';
+		wait for 10 ns;
+		
+		---Sin process for 0-40 ns
+		Sin <= '0';
+		wait for 40 ns;
+		
+		---Sin process for 40-80 ns
+		Sin <= '1';
+		wait for 10 ns;
+		Sin <= '0';
+		wait for 10 ns;
+		Sin <= '1';
+		wait for 10 ns;
+		Sin <= '0';
+		wait for 10 ns;
+		---Sin process for 80-120 ns
+	
+	end process;
+	
+	-- Stimulus process for RST
+
+	stim_proc_RST: process
+	begin
+		wait for 122.5 ns;
+		RST <= '1';
+		wait for 5 ns;
+		RST <= '0';
+		wait;
+	end process;
+
+	
+END;

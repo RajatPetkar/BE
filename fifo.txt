@@ -1,0 +1,209 @@
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
+
+entity FIFO is
+    Port ( CLK        : in  STD_LOGIC;
+           RST        : in  STD_LOGIC;
+           rd_en      : in  STD_LOGIC;
+           wr_en      : in  STD_LOGIC;
+           data_in    : in  STD_LOGIC_VECTOR (7 downto 0);
+           data_out   : out STD_LOGIC_VECTOR (7 downto 0);
+           fifo_empty : out STD_LOGIC;
+           fifo_full  : out STD_LOGIC);
+end FIFO;
+
+architecture FIFO_arch of FIFO is
+
+    constant depth : integer := 16;
+    type memory_type is array (0 to depth-1) of std_logic_vector(7 downto 0);
+    signal memory   : memory_type := (others => (others => '0'));
+
+    signal readptr  : integer range 0 to depth-1 := 0;
+    signal writeptr : integer range 0 to depth-1 := 0;
+    signal count    : integer range 0 to depth   := 0;
+
+begin
+
+    process(CLK, RST)
+    begin
+        if (RST = '1') then
+            memory    <= (others => (others => '0'));
+            data_out  <= (others => '0');
+            readptr   <= 0;
+            writeptr  <= 0;
+            count     <= 0;
+            fifo_empty <= '1';
+            fifo_full  <= '0';
+
+        elsif rising_edge(CLK) then
+
+            -- READ operation
+            if (rd_en = '1' and count > 0) then
+                data_out <= memory(readptr);
+                if (readptr = depth-1) then
+                    readptr <= 0;
+                else
+                    readptr <= readptr + 1;
+                end if;
+                count <= count - 1;
+            end if;
+
+            -- WRITE operation
+            if (wr_en = '1' and count < depth) then
+                memory(writeptr) <= data_in;
+                if (writeptr = depth-1) then
+                    writeptr <= 0;
+                else
+                    writeptr <= writeptr + 1;
+                end if;
+                count <= count + 1;
+            end if;
+
+            -- STATUS FLAGS
+            if (count = 0) then
+                fifo_empty <= '1';
+            else
+                fifo_empty <= '0';
+            end if;
+
+            if (count = depth) then
+                fifo_full <= '1';
+            else
+                fifo_full <= '0';
+            end if;
+
+        end if;
+    end process;
+
+end FIFO_arch;
+
+
+
+LIBRARY ieee;
+USE ieee.std_logic_1164.ALL;
+USE ieee.numeric_std.ALL;  -- instead of non-standard std_logic_arith
+
+ENTITY FIFO_tb IS
+END FIFO_tb;
+ 
+ARCHITECTURE behavior OF FIFO_tb IS 
+     
+    COMPONENT FIFO
+    PORT(
+         CLK : IN  std_logic;
+         RST : IN  std_logic;
+         rd_en : IN  std_logic;
+         wr_en : IN  std_logic;
+         data_in : IN  std_logic_vector(7 downto 0);
+         data_out : OUT  std_logic_vector(7 downto 0);
+         fifo_empty : OUT  std_logic;
+         fifo_full : OUT  std_logic
+        );
+    END COMPONENT;
+    
+
+   --Inputs
+   signal CLK : std_logic := '0';
+   signal RST : std_logic := '0';
+   signal rd_en : std_logic := '0';
+   signal wr_en : std_logic := '0';
+   signal data_in : std_logic_vector(7 downto 0) := (others => '0');
+
+ 	--Outputs
+   signal data_out : std_logic_vector(7 downto 0);
+   signal fifo_empty : std_logic;
+   signal fifo_full : std_logic;
+
+   -- Clock period definitions
+   constant CLK_period : time := 10 ns;
+ 
+BEGIN
+ 
+	-- Instantiate the Unit Under Test (UUT)
+   uut: FIFO PORT MAP (
+          CLK => CLK,
+          RST => RST,
+          rd_en => rd_en,
+          wr_en => wr_en,
+          data_in => data_in,
+          data_out => data_out,
+          fifo_empty => fifo_empty,
+          fifo_full => fifo_full
+        );
+
+   -- Clock process definitions
+   CLK_process :process
+   begin
+		CLK <= '0';
+		wait for CLK_period/2;
+		CLK <= '1';
+		wait for CLK_period/2;
+   end process;
+ 
+
+   -- Stimulus process
+   stim_proc: process
+   begin		
+      -- Apply reset
+      RST <= '1';
+      wait for CLK_period;
+      RST <= '0';
+      wait for CLK_period*3;
+
+      -- Write 10 values (1-10)
+      wr_en <= '1';
+      rd_en <= '0';
+      for i in 1 to 10 loop
+         data_in <= std_logic_vector(to_unsigned(i, 8));
+         wait for CLK_period;
+      end loop;
+      wr_en <= '0';
+
+      -- Read 4 values
+      rd_en <= '1';
+      wait for CLK_period*4;
+      rd_en <= '0';
+
+      wait for CLK_period*10;
+
+      -- Write 10 values (11-20)
+      wr_en <= '1';
+      for i in 11 to 20 loop
+         data_in <= std_logic_vector(to_unsigned(i, 8));
+         wait for CLK_period;
+      end loop;
+      wr_en <= '0';
+
+      wait for CLK_period*10;
+
+      -- Read 4 values
+      rd_en <= '1';
+      wait for CLK_period*4;
+      rd_en <= '0';
+
+      wait for CLK_period;
+
+      -- Read 4 values
+      rd_en <= '1';
+      wait for CLK_period*8;
+      rd_en <= '0';
+
+      wait for CLK_period;
+
+      -- Read 8 values
+      rd_en <= '1';
+      wait for CLK_period*4;
+      rd_en <= '0';
+
+      wait for CLK_period;
+
+      -- Read 4 values
+      rd_en <= '1';
+      wait for CLK_period*4;
+      rd_en <= '0';
+
+      wait;
+   end process;
+
+END;
